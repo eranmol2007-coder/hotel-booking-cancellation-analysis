@@ -1,46 +1,148 @@
+import os
+import sys
+import logging
+
+# Ensure project root is importable
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pandas as pd
-import numpy as np
-from dataloader import df_r
+from config import LEAD_TIME_BINS, LEAD_TIME_LABELS, NIGHT_BINS, NIGHT_LABELS
 
-# df = pd.read_csv("hotel_bookings.csv")
-
+logger = logging.getLogger('hotel_analysis')
 
 
-df_r = df_r.drop_duplicates()
+def clean_data(df):
+    """
+    Cleans the hotel booking dataset:
+    - Drops duplicate rows
+    - Converts date columns to datetime
+    - Drops rows with missing values in critical columns
+    - Removes rows with invalid Is_Canceled values (not 0 or 1)
 
-df_r["Booking_Date"] = pd.to_datetime(df_r["Booking_Date"], errors="coerce")
-df_r["Arrival_Date"] = pd.to_datetime(df_r["Arrival_Date"], errors="coerce")
+    Args:
+        df (pd.DataFrame): Raw dataframe.
 
-print(df_r.isnull().sum())
-print(df_r["Is_Canceled"].value_counts(dropna=False))
+    Returns:
+        pd.DataFrame: Cleaned dataframe.
+    """
+    logger.info("Starting data cleaning...")
+    initial_rows = len(df)
 
-df = df_r
-print(df)
+    # Drop duplicate rows
+    df = df.drop_duplicates()
+    dropped = initial_rows - len(df)
+    if dropped > 0:
+        logger.info("Dropped %d duplicate rows.", dropped)
+    else:
+        logger.info("No duplicate rows found.")
+
+    # Convert date columns to datetime
+    df["Booking_Date"] = pd.to_datetime(df["Booking_Date"], errors="coerce")
+    df["Arrival_Date"] = pd.to_datetime(df["Arrival_Date"], errors="coerce")
+
+    # Drop rows with missing values in critical columns
+    critical_cols = [
+        "Booking_Date", "Arrival_Date", "Is_Canceled", "Room_Type",
+        "Customer_Type", "Lead_Time_Days", "Season", "Booking_Channel"
+    ]
+    before = len(df)
+    df = df.dropna(subset=critical_cols)
+    dropped_nulls = before - len(df)
+    if dropped_nulls > 0:
+        logger.warning("Dropped %d rows with missing values in critical columns.", dropped_nulls)
+    else:
+        logger.info("No missing values in critical columns.")
+
+    # Remove rows with invalid Is_Canceled values (must be 0 or 1)
+    before = len(df)
+    df = df[df["Is_Canceled"].isin([0, 1])]
+    dropped_invalid = before - len(df)
+    if dropped_invalid > 0:
+        logger.warning("Dropped %d rows with invalid Is_Canceled values.", dropped_invalid)
+    else:
+        logger.info("All Is_Canceled values are valid (0 or 1).")
+
+    # Log any remaining missing values in non-critical columns
+    remaining_nulls = df.isnull().sum()
+    if remaining_nulls.sum() > 0:
+        logger.info("Remaining missing values in non-critical columns:")
+        for col, count in remaining_nulls[remaining_nulls > 0].items():
+            logger.info("  %s: %d missing", col, count)
+
+    logger.info(
+        "Data cleaning completed. %d rows retained from %d original.",
+        len(df), initial_rows
+    )
+    return df
 
 
-# print(df['Booking_Channel'])
+def feature_engineering(df):
+    """
+    Adds derived features to the cleaned dataframe:
+    - Month: booking month as a period
+    - Lead_Time_Band: categorized lead time
+    - Booking_Value: Room_Rate × Nights (revenue proxy)
+    - Stay_Duration_Band: categorized stay length
+    - Total_Guests: Adults + Children
+
+    Args:
+        df (pd.DataFrame): Cleaned dataframe.
+
+    Returns:
+        pd.DataFrame: Dataframe with new engineered features.
+    """
+    # Create Month column
+    df['Month'] = df['Booking_Date'].dt.to_period('M')
+
+    # Create Lead Time Band
+    df["Lead_Time_Band"] = pd.cut(
+        df["Lead_Time_Days"],
+        bins=LEAD_TIME_BINS,
+        labels=LEAD_TIME_LABELS
+    )
+
+    # Create Booking Value (revenue proxy: rate × nights)
+    df["Booking_Value"] = df["Room_Rate"] * df["Nights"]
+
+    # Create Stay Duration Band
+    df["Stay_Duration_Band"] = pd.cut(
+        df["Nights"],
+        bins=NIGHT_BINS,
+        labels=NIGHT_LABELS
+    )
+
+    # Create Total Guests
+    df["Total_Guests"] = df["Adults"] + df["Children"]
+
+    logger.info(
+        "Feature engineering completed. Added: Month, Lead_Time_Band, "
+        "Booking_Value, Stay_Duration_Band, Total_Guests"
+    )
+    return df
 
 
-# Create a Month column
-df['Month'] = df['Booking_Date'].dt.to_period('M')
+def preprocess(df):
+    """
+    Orchestrates the full preprocessing pipeline.
 
-# Monthly total bookings
-monthly_bookings = df.groupby('Month').size()
+    Args:
+        df (pd.DataFrame): Raw dataframe.
 
-# Monthly cancelled bookings
-monthly_cancellations = df[df['Is_Canceled'] == 1].groupby('Month').size()
+    Returns:
+        pd.DataFrame: Fully processed dataframe ready for analysis.
+    """
+    df_clean = clean_data(df)
+    df_processed = feature_engineering(df_clean)
+    return df_processed
 
-# Monthly cancellation rate
-monthly_cancellation_rate = (
-    df.groupby('Month')['Is_Canceled'].mean() * 100
-)
 
-# Display the results
-monthly_analysis = pd.DataFrame({
-    'Total_Bookings': monthly_bookings,
-    'Cancelled_Bookings': monthly_cancellations,
-    'Cancellation_Rate': monthly_cancellation_rate
-}).fillna(0)
+if __name__ == "__main__":
+    from config import setup_logging
+    from src.data_loader import load_data
 
-print(monthly_analysis)
+    setup_logging()
+    df = load_data()
+    if df is not None:
+        df_processed = preprocess(df)
+        print(df_processed.head())
+        print(df_processed.dtypes)

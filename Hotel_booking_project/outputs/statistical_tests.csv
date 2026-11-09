@@ -1,0 +1,9 @@
+Variable,Chi_Square,P_Value,Degrees_of_Freedom,Significant_at_0.05
+Season,7.7723,0.050959,3,False
+Room_Type,0.6152,0.892949,3,False
+Customer_Type,0.4222,0.935616,3,False
+Booking_Channel,2.5408,0.467971,3,False
+Deposit_Type,17.603,0.000151,2,True
+Hotel_Type,0.0298,0.862831,1,False
+Market_Segment,5.9784,0.200768,4,False
+Meal_Plan,1.8502,0.604063,3,False
