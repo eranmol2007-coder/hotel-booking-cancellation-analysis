@@ -185,6 +185,29 @@ pytest tests/ -v
 
 ---
 
+## 🌐 Interactive Streamlit Web Application
+
+The project includes a production-grade **Streamlit web application** that transforms the analysis into an interactive intelligence dashboard for stakeholders and hotel managers.
+
+### Launch the App
+
+```bash
+# Run from the workspace root:
+streamlit run app.py
+
+# Or run from inside Hotel_booking_project:
+cd Hotel_booking_project
+streamlit run app.py
+```
+
+### Dashboard Capabilities & Modules:
+1. 📊 **Executive Overview & Dynamic KPIs:** Live metrics for total bookings, cancellation rate, potential revenue, lost revenue, and retained revenue with status splits and monthly trends, plus dark-mode compatible executive takeaways.
+2. 🔍 **Dimensional Root Cause Drivers:** Filter and inspect cancellation behavior across Lead Time, Deposit Type, Room Type, Customer Type, Booking Channel, Season, and Special Requests.
+3. 🗺️ **Cross-Dimensional Heatmaps:** Pre-built cross-tabulations (Season × Customer, Room × Lead Time) plus a **Custom Heatmap Matrix Builder** for any two categorical variables.
+4. 📋 **Data Explorer & Executive Report:** Searchable, downloadable CSV dataset viewer and formatted management strategy report with operational recommendations.
+
+---
+
 ## 📊 Visualizations Generated
 
 The project creates **13 professional visualizations** in the `outputs/` folder:
